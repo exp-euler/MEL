@@ -292,6 +292,8 @@ namespace MEL {
         template<typename T, typename R = void>
         using enable_if_deep_not_pointer = typename std::enable_if<HasDeepCopyMethod<T>::Has && !std::is_pointer<T>::value, R>::type;
         template<typename T, typename R = void>
+        using enable_if_not_deep_pointer = typename std::enable_if<!HasDeepCopyMethod<T>::Has && std::is_pointer<T>::value, R>::type;
+        template<typename T, typename R = void>
         using enable_if_not_deep_not_pointer = typename std::enable_if<!HasDeepCopyMethod<T>::Has && !std::is_pointer<T>::value, R>::type;
 
         template<typename T> struct is_vector : public std::false_type {};
@@ -646,8 +648,9 @@ namespace MEL {
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Root STL
 
+            // ###### EDITED #######
             template<typename T>
-            inline enable_if_not_deep<T> packRootSTL(std::vector<T> &obj) {
+            inline enable_if_not_deep_pointer<T> packRootSTL(std::vector<T> &obj) {
                 int len;
                 if (TRANSPORT_METHOD::SOURCE) {
                     len = obj.size(); transport(len);
@@ -659,7 +662,30 @@ namespace MEL {
 
                 T *p = &obj[0];
                 if (len > 0) transport(p, len);
+                // ###### ADDED #######
+                /// Copy content
+                for (int i = 0; i < len; ++i) {
+                    packPtr(obj[i]);
+                }
+                // ###### ADDED #######
             };
+            template<typename T>
+            inline enable_if_not_deep_not_pointer<T> packRootSTL(std::vector<T> &obj) {
+                int len;
+                if (TRANSPORT_METHOD::SOURCE) {
+                    len = obj.size(); transport(len);
+                }
+                else {
+                    int rank = MEL::CommRank(MEL::Comm::WORLD);
+                    std::cout << "HELLOO " << rank << "\n";
+                    transport(len); obj.resize(len);
+                    for (int i = 0; i < len; ++i) (&obj[i])->~T();
+                }
+
+                T *p = &obj[0];
+                if (len > 0) transport(p, len);
+            };
+            // ###### EDITED #######
 
             template<typename T, DEEP_FUNCTOR<T, TRANSPORT_METHOD, HASH_MAP> F>
             inline void packRootSTL(std::vector<T> &obj) {
