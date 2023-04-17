@@ -25,6 +25,7 @@ SOFTWARE.
 
 #include "MEL.hpp"
 
+#include <Eigen/Dense>
 #include <vector>
 #include <list>
 #include <fstream>
@@ -306,12 +307,19 @@ namespace MEL {
         //template <typename T>
         //using is_string = typename std::is_same<T, std::string>;
         
+        template<typename T> struct is_eigen_matrix : public std::false_type {};
+        template<>
+        struct is_eigen_matrix<Eigen::MatrixXd> : public std::true_type{};
+
         template<typename T, typename R = void>
         using enable_if_stl = typename std::enable_if<is_vector<T>::value || is_list<T>::value, R>::type; //  || is_string<T>::value
+        using enable_if_eigen_matrix = typename std::enable_if<is_eigen_matrix<T>::value, R>::type;
         template<typename T, typename R = void>
-        using enable_if_not_pointer_not_stl = typename std::enable_if<!(is_vector<T>::value || is_list<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
+        // TODO: Added not_eigen in definition, but not in name!
         template<typename T, typename R = void>
-        using enable_if_deep_not_pointer_not_stl = typename std::enable_if<HasDeepCopyMethod<T>::Has && !(is_vector<T>::value || is_list<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
+        using enable_if_not_pointer_not_stl = typename std::enable_if<!(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
+        template<typename T, typename R = void>
+        using enable_if_deep_not_pointer_not_stl = typename std::enable_if<HasDeepCopyMethod<T>::Has && !(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
 
         template<typename T, typename TRANSPORT_METHOD, typename HASH_MAP>
         using DEEP_FUNCTOR = void(*)(T&, MEL::Deep::Message<TRANSPORT_METHOD, HASH_MAP>&); 
@@ -777,6 +785,32 @@ namespace MEL {
             };
 
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // Root MatrixXd
+            //template<typename T>
+            //inline enable_if_not_deep<T> packRootMatrixXd(Eigen::Matrix<T, T_rows, T_cols> &obj) {
+            inline enable_if_not_deep<double> packRootMatrixXd(Eigen::MatrixXd &obj) {
+                int rows;
+                int cols;
+                if (TRANSPORT_METHOD::SOURCE) {
+                    rows = obj.rows(); transport(rows);
+                    cols = obj.cols(); transport(cols);
+                }
+                else {
+                    int rank = MEL::CommRank(MEL::Comm::WORLD);
+                    std::cout << "MATRIX" << rank << "\n";
+                    transport(rows); transport(cols);
+                    obj.resize(rows, cols);
+                    //for (int i = 0; i < rows+cols; ++i) (&obj[i])->~T();
+                    //for (int i = 0; i < rows+cols; ++i) (&(obj(0,0))+i)->~double();
+                }
+
+                //T *p = &obj[0];
+                double *p = &obj(0,0);
+                if (rows+cols > 0) transport(p, rows+cols);
+            };
+
+
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Shorthand Overloads
 
             template<typename T>
@@ -803,6 +837,7 @@ namespace MEL {
             };
         };
 
+#define TEMPLATE_MAT_E template<typename M, typename HASH_MAP = MEL::Deep::PointerHashMap>
 #define TEMPLATE_STL template<typename S, typename HASH_MAP = MEL::Deep::PointerHashMap>
 #define TEMPLATE_T   template<typename T, typename HASH_MAP = MEL::Deep::PointerHashMap>
 #define TEMPLATE_P   template<typename P, typename HASH_MAP = MEL::Deep::PointerHashMap>
@@ -1010,6 +1045,7 @@ namespace MEL {
 
         TEMPLATE_STL
         inline enable_if_stl<S> Send(S &obj, const int dst, const int tag, const Comm &comm) {
+            std::cout << "Send STL" << "\n";
             Message<TransportSend, HASH_MAP> msg(dst, tag, comm);
             msg.packRootSTL(obj);
         };
@@ -1051,6 +1087,17 @@ namespace MEL {
         inline enable_if_stl<S> BufferedSend(S &obj, const int dst, const int tag, const Comm &comm) {
             MEL::Deep::BufferedSend<S, HASH_MAP, F>(obj, dst, tag, comm, MEL::Deep::BufferSize<S, HASH_MAP, F>(obj));
         };
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Root MatrixXd
+
+        TEMPLATE_MAT_E
+        inline enable_if_eigen_matrix<M> Send(M &obj, const int dst, const int tag, const Comm &comm) {
+            std::cout << "Send MAT" << "\n";
+            Message<TransportSend, HASH_MAP> msg(dst, tag, comm);
+            msg.packRootMatrixXd(obj);
+        };
+
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Object
@@ -1246,6 +1293,7 @@ namespace MEL {
 
         TEMPLATE_STL
         inline enable_if_stl<S> Recv(S &obj, const int src, const int tag, const Comm &comm) {
+            std::cout << "Recv STL" << "\n";
             Message<TransportRecv, HASH_MAP> msg(src, tag, comm);
             msg.packRootSTL(obj);
         };
@@ -1281,6 +1329,17 @@ namespace MEL {
 
             MEL::MemFree(buffer);
         };
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Root MatrixXd
+
+        TEMPLATE_MAT_E
+        inline enable_if_eigen_matrix<M> Recv(M &obj, const int src, const int tag, const Comm &comm) {
+            std::cout << "Recv MAT" << "\n";
+            Message<TransportSend, HASH_MAP> msg(src, tag, comm);
+            msg.packRootMatrixXd(obj);
+        };
+
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Object
