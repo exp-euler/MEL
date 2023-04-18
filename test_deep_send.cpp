@@ -22,9 +22,14 @@ template<typename MSG> void VecP_DeepCopy(double* &obj, MSG &msg) {
     msg.packPtr(obj);
 }
 
-// External - Global free deep-copy function for vectors of pointers
+// External - Global free deep-copy function for vectors of MatrixXd
 template<typename MSG> void VecM_DeepCopy(Eigen::MatrixXd &obj, MSG &msg) {
     msg.packMatrixXd(obj);
+}
+
+// External - Global free deep-copy function for vectors of vectors
+template<typename MSG> void VecV_DeepCopy(std::vector<double> &obj, MSG &msg) {
+    msg.packSTL(obj);
 }
 
 int main(int argc, char *argv[]) {
@@ -40,12 +45,19 @@ int main(int argc, char *argv[]) {
 
     if(rank == 0){
 
+        double d0 = 2.4;
+        std::vector<std::vector<double>> T0 {{d0}};
+        std::cout << "Rank0: " << "\n";
+        std::cout << (T0[0])[0] << "\n";
+        MEL::Deep::Send<std::vector<std::vector<double>>, MEL::Deep::PointerHashMap, VecV_DeepCopy> (T0, 1, 99, comm);
+        /*
         //std::vector<double> T0 {1.0, 3.5, 2.5};
         double d0 = 2.4;
         std::vector<double *> T0 {&d0};
         std::cout << "Rank0: " << "\n";
         std::cout << *T0[0] << "\n";
         MEL::Deep::Send<std::vector<double *>, MEL::Deep::PointerHashMap, VecP_DeepCopy> (T0, 1, 99, comm);
+        */
 
         /*
         Eigen::MatrixXd M0 {{1,2,3},{4,5,6},{7,8,9}};
@@ -72,14 +84,20 @@ int main(int argc, char *argv[]) {
     MEL::Barrier(comm);
 
     if(rank == 1){
-        //Eigen::MatrixXd T1;
-        //Eigen::ArrayXd T1(2);
+
+        std::vector<std::vector<double>> T1;
+        MEL::Deep::Recv<std::vector<std::vector<double>>, MEL::Deep::PointerHashMap,
+                VecV_DeepCopy> (T1, 0, 99, comm);
+        std::cout << "Rank1: " << "\n";
+        std::cout << (T1[0])[0] << "\n";
+
+        /*
         std::vector<double *> T1;
         MEL::Deep::Recv<std::vector<double *>, MEL::Deep::PointerHashMap,
                 VecP_DeepCopy> (T1, 0, 99, comm);
-        //MEL::Deep::Recv(T1, 0, 99, comm);
         std::cout << "Rank1: " << "\n";
         std::cout << *T1[0] << "\n";
+        */
 
         /*
         std::vector<Eigen::MatrixXd> T1;
