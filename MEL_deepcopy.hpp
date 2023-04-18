@@ -313,10 +313,10 @@ namespace MEL {
 
         template<typename T, typename R = void>
         using enable_if_stl = typename std::enable_if<is_vector<T>::value || is_list<T>::value, R>::type; //  || is_string<T>::value
+        template<typename T, typename R = void>
         using enable_if_eigen_matrix = typename std::enable_if<is_eigen_matrix<T>::value, R>::type;
         template<typename T, typename R = void>
         // TODO: Added not_eigen in definition, but not in name!
-        template<typename T, typename R = void>
         using enable_if_not_pointer_not_stl = typename std::enable_if<!(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
         template<typename T, typename R = void>
         using enable_if_deep_not_pointer_not_stl = typename std::enable_if<HasDeepCopyMethod<T>::Has && !(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
@@ -677,6 +677,7 @@ namespace MEL {
                 }
                 // ###### ADDED #######
             };
+
             template<typename T>
             inline enable_if_not_deep_not_pointer<T> packRootSTL(std::vector<T> &obj) {
                 int len;
@@ -808,7 +809,6 @@ namespace MEL {
                 double *p = &obj(0,0);
                 if (rows+cols > 0) transport(p, rows+cols);
             };
-
 
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Shorthand Overloads
@@ -1098,7 +1098,6 @@ namespace MEL {
             msg.packRootMatrixXd(obj);
         };
 
-
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Object
 
@@ -1339,7 +1338,6 @@ namespace MEL {
             Message<TransportSend, HASH_MAP> msg(src, tag, comm);
             msg.packRootMatrixXd(obj);
         };
-
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Object
