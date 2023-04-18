@@ -810,6 +810,28 @@ namespace MEL {
                 if (rows+cols > 0) transport(p, rows*cols);
             };
 
+            //template<typename T>
+            //inline enable_if_not_deep<T> packMatrixXd(Eigen::Matrix<T, T_rows, T_cols> &obj) {
+            inline enable_if_not_deep<double> packMatrixXd(Eigen::MatrixXd &obj) {
+                int rows;
+                int cols;
+                if (TRANSPORT_METHOD::SOURCE) {
+                    rows = obj.rows(); transport(rows);
+                    cols = obj.cols(); transport(cols);
+                }
+                else {
+                    transport(rows); transport(cols);
+                    new (&obj) Eigen::MatrixXd;
+                    obj.resize(rows, cols);
+                    //for (int i = 0; i < rows+cols; ++i) (&obj[i])->~T();
+                    //for (int i = 0; i < rows+cols; ++i) (&(obj(0,0))+i)->~double();
+                }
+
+                //T *p = &obj[0];
+                double *p = &obj(0,0);
+                if (rows+cols > 0) transport(p, rows*cols);
+            };
+
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Shorthand Overloads
 
