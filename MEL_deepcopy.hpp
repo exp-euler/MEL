@@ -682,11 +682,11 @@ namespace MEL {
             inline enable_if_not_deep_not_pointer<T> packRootSTL(std::vector<T> &obj) {
                 int len;
                 if (TRANSPORT_METHOD::SOURCE) {
+                    int rank = MEL::CommRank(MEL::Comm::WORLD);
+                    std::cout << "HELLOO " << rank << "\n";
                     len = obj.size(); transport(len);
                 }
                 else {
-                    int rank = MEL::CommRank(MEL::Comm::WORLD);
-                    std::cout << "HELLOO " << rank << "\n";
                     transport(len); obj.resize(len);
                     for (int i = 0; i < len; ++i) (&obj[i])->~T();
                 }
@@ -793,12 +793,12 @@ namespace MEL {
                 int rows;
                 int cols;
                 if (TRANSPORT_METHOD::SOURCE) {
+                    int rank = MEL::CommRank(MEL::Comm::WORLD);
+                    std::cout << "MATRIX" << rank << "\n";
                     rows = obj.rows(); transport(rows);
                     cols = obj.cols(); transport(cols);
                 }
                 else {
-                    int rank = MEL::CommRank(MEL::Comm::WORLD);
-                    std::cout << "MATRIX" << rank << "\n";
                     transport(rows); transport(cols);
                     obj.resize(rows, cols);
                     //for (int i = 0; i < rows+cols; ++i) (&obj[i])->~T();
@@ -807,7 +807,7 @@ namespace MEL {
 
                 //T *p = &obj[0];
                 double *p = &obj(0,0);
-                if (rows+cols > 0) transport(p, rows+cols);
+                if (rows+cols > 0) transport(p, rows*cols);
             };
 
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1335,7 +1335,7 @@ namespace MEL {
         TEMPLATE_MAT_E
         inline enable_if_eigen_matrix<M> Recv(M &obj, const int src, const int tag, const Comm &comm) {
             std::cout << "Recv MAT" << "\n";
-            Message<TransportSend, HASH_MAP> msg(src, tag, comm);
+            Message<TransportRecv, HASH_MAP> msg(src, tag, comm);
             msg.packRootMatrixXd(obj);
         };
 

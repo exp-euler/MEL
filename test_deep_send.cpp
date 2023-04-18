@@ -54,6 +54,8 @@ int main(int argc, char *argv[]) {
         MEL::Deep::Send(T0, 1, 99, comm);
     }
 
+    MEL::Barrier(comm);
+
     if(rank == 1){
         /*
         //Eigen::MatrixXd T1;
