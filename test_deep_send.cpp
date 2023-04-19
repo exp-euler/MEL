@@ -32,6 +32,16 @@ template<typename MSG> void VecVEigen_DeepCopy(Eigen::VectorXd &obj, MSG &msg) {
     msg.packVectorXd(obj);
 }
 
+// External - Global free deep-copy function for vectors of ArrayXXi
+template<typename MSG> void VecArr2D_DeepCopy(Eigen::ArrayXXi &obj, MSG &msg) {
+    msg.packArrayXXi(obj);
+}
+
+// External - Global free deep-copy function for vectors of ArrayXi
+template<typename MSG> void VecArr1D_DeepCopy(Eigen::ArrayXi &obj, MSG &msg) {
+    msg.packArrayXi(obj);
+}
+
 // External - Global free deep-copy function for vectors of vectors
 template<typename MSG> void VecVSTL_DeepCopy(std::vector<double> &obj, MSG &msg) {
     msg.packSTL(obj);
@@ -75,11 +85,27 @@ int main(int argc, char *argv[]) {
         MEL::Deep::Send<std::vector<Eigen::MatrixXd>, MEL::Deep::PointerHashMap, VecM_DeepCopy> (T0, 1, 99, comm);
         */
 
+        /*
         Eigen::VectorXd VE0 {{1,2,3}};
         std::vector<Eigen::VectorXd> T0 {VE0};
         std::cout << "Rank0: " << "\n";
         std::cout << T0[0] << "\n";
         MEL::Deep::Send<std::vector<Eigen::VectorXd>, MEL::Deep::PointerHashMap, VecVEigen_DeepCopy> (T0, 1, 99, comm);
+        */
+
+        /*
+        Eigen::ArrayXXi A0 {{1,2,3},{4,5,6},{7,8,9}};
+        std::vector<Eigen::ArrayXXi> T0 {A0};
+        std::cout << "Rank0: " << "\n";
+        std::cout << T0[0] << "\n";
+        MEL::Deep::Send<std::vector<Eigen::ArrayXXi>, MEL::Deep::PointerHashMap, VecArr2D_DeepCopy> (T0, 1, 99, comm);
+        */
+
+        Eigen::ArrayXi A0 {{1,2,3}};
+        std::vector<Eigen::ArrayXi> T0 {A0};
+        std::cout << "Rank0: " << "\n";
+        std::cout << T0[0] << "\n";
+        MEL::Deep::Send<std::vector<Eigen::ArrayXi>, MEL::Deep::PointerHashMap, VecArr1D_DeepCopy> (T0, 1, 99, comm);
 
         /*
         Eigen::MatrixXd T0 {{1,2,3},{4,5,6},{7,8,9}};
@@ -123,11 +149,27 @@ int main(int argc, char *argv[]) {
         std::cout << T1[0] << "\n";
         */
 
+        /*
+        std::vector<Eigen::ArrayXXi> T1;
+        MEL::Deep::Recv<std::vector<Eigen::ArrayXXi>, MEL::Deep::PointerHashMap,
+                VecArr2D_DeepCopy> (T1, 0, 99, comm);
+        std::cout << "Rank1: " << "\n";
+        std::cout << T1[0] << "\n";
+        */
+
+        std::vector<Eigen::ArrayXi> T1;
+        MEL::Deep::Recv<std::vector<Eigen::ArrayXi>, MEL::Deep::PointerHashMap,
+                VecArr1D_DeepCopy> (T1, 0, 99, comm);
+        std::cout << "Rank1: " << "\n";
+        std::cout << T1[0] << "\n";
+
+        /*
         std::vector<Eigen::VectorXd> T1;
         MEL::Deep::Recv<std::vector<Eigen::VectorXd>, MEL::Deep::PointerHashMap,
                 VecVEigen_DeepCopy> (T1, 0, 99, comm);
         std::cout << "Rank1: " << "\n";
         std::cout << T1[0] << "\n";
+        */
         
         /*
         Eigen::MatrixXd T1;

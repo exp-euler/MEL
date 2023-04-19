@@ -865,6 +865,38 @@ namespace MEL {
                 if (rows > 0) transport(p, rows);
             };
 
+            inline enable_if_not_deep<double> packArrayXXi(Eigen::ArrayXXi &obj) {
+                int rows;
+                int cols;
+                if (TRANSPORT_METHOD::SOURCE) {
+                    rows = obj.rows(); transport(rows);
+                    cols = obj.cols(); transport(cols);
+                }
+                else {
+                    transport(rows); transport(cols);
+                    new (&obj) Eigen::ArrayXXi;
+                    obj.resize(rows, cols);
+                }
+
+                int *p = &obj(0,0);
+                if (rows+cols > 0) transport(p, rows*cols);
+            };
+
+            inline enable_if_not_deep<double> packArrayXi(Eigen::ArrayXi &obj) {
+                int rows; // Because it is saved as an Eigen Matrix
+                if (TRANSPORT_METHOD::SOURCE) {
+                    rows = obj.rows(); transport(rows);
+                }
+                else {
+                    transport(rows);
+                    new (&obj) Eigen::ArrayXi;
+                    obj.resize(rows);
+                }
+
+                int *p = &obj(0,0);
+                if (rows > 0) transport(p, rows);
+            };
+
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Shorthand Overloads
 
