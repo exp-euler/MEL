@@ -310,16 +310,34 @@ namespace MEL {
         template<typename T> struct is_eigen_matrix : public std::false_type {};
         template<>
         struct is_eigen_matrix<Eigen::MatrixXd> : public std::true_type{};
+        //template<typename Scalar, int RowsAtCompile, int ColsAtCompile>
+        //struct is_eigen_matrix<Eigen::Matrix<Scalar, RowsAtCompile, ColsAtCompile>> : public std::true_type{};
+        template<typename T> struct is_eigen_vector : public std::false_type {};
+        template<>
+        struct is_eigen_vector<Eigen::VectorXd> : public std::true_type{};
+        template<typename T> struct is_eigen_array1D : public std::false_type {};
+        template<>
+        struct is_eigen_array1D<Eigen::ArrayXi> : public std::true_type{};
+        template<typename T> struct is_eigen_array2D : public std::false_type {};
+        template<>
+        struct is_eigen_array2D<Eigen::ArrayXXi> : public std::true_type{};
+
+        template<typename T, typename R = void>
+        using enable_if_eigen_matrix = typename std::enable_if<is_eigen_matrix<T>::value, R>::type;
+        template<typename T, typename R = void>
+        using enable_if_eigen_vector = typename std::enable_if<is_eigen_vector<T>::value, R>::type;
+        template<typename T, typename R = void>
+        using enable_if_eigen_array1D = typename std::enable_if<is_eigen_array1D<T>::value, R>::type;
+        template<typename T, typename R = void>
+        using enable_if_eigen_array2D= typename std::enable_if<is_eigen_array2D<T>::value, R>::type;
 
         template<typename T, typename R = void>
         using enable_if_stl = typename std::enable_if<is_vector<T>::value || is_list<T>::value, R>::type; //  || is_string<T>::value
         template<typename T, typename R = void>
-        using enable_if_eigen_matrix = typename std::enable_if<is_eigen_matrix<T>::value, R>::type;
-        template<typename T, typename R = void>
         // TODO: Added not_eigen in definition, but not in name!
-        using enable_if_not_pointer_not_stl = typename std::enable_if<!(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
+        using enable_if_not_pointer_not_stl = typename std::enable_if<!(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value || is_eigen_vector<T>::value || is_eigen_array1D<T>::value || is_eigen_array2D<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
         template<typename T, typename R = void>
-        using enable_if_deep_not_pointer_not_stl = typename std::enable_if<HasDeepCopyMethod<T>::Has && !(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
+        using enable_if_deep_not_pointer_not_stl = typename std::enable_if<HasDeepCopyMethod<T>::Has && !(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value || is_eigen_vector<T>::value || is_eigen_array1D<T>::value || is_eigen_array2D<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
 
         template<typename T, typename TRANSPORT_METHOD, typename HASH_MAP>
         using DEEP_FUNCTOR = void(*)(T&, MEL::Deep::Message<TRANSPORT_METHOD, HASH_MAP>&); 
@@ -786,7 +804,7 @@ namespace MEL {
             };
 
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            // Root MatrixXd
+            // Root Eigen
             //template<typename T>
             //inline enable_if_not_deep<T> packRootMatrixXd(Eigen::Matrix<T, T_rows, T_cols> &obj) {
             inline enable_if_not_deep<double> packRootMatrixXd(Eigen::MatrixXd &obj) {
@@ -810,6 +828,9 @@ namespace MEL {
                 if (rows+cols > 0) transport(p, rows*cols);
             };
 
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // Eigen
+
             //template<typename T>
             //inline enable_if_not_deep<T> packMatrixXd(Eigen::Matrix<T, T_rows, T_cols> &obj) {
             inline enable_if_not_deep<double> packMatrixXd(Eigen::MatrixXd &obj) {
@@ -823,13 +844,25 @@ namespace MEL {
                     transport(rows); transport(cols);
                     new (&obj) Eigen::MatrixXd;
                     obj.resize(rows, cols);
-                    //for (int i = 0; i < rows+cols; ++i) (&obj[i])->~T();
-                    //for (int i = 0; i < rows+cols; ++i) (&(obj(0,0))+i)->~double();
                 }
 
-                //T *p = &obj[0];
                 double *p = &obj(0,0);
                 if (rows+cols > 0) transport(p, rows*cols);
+            };
+
+            inline enable_if_not_deep<double> packVectorXd(Eigen::VectorXd &obj) {
+                int rows; // Because it is saved as an Eigen Matrix
+                if (TRANSPORT_METHOD::SOURCE) {
+                    rows = obj.rows(); transport(rows);
+                }
+                else {
+                    transport(rows);
+                    new (&obj) Eigen::VectorXd;
+                    obj.resize(rows);
+                }
+
+                double *p = &obj(0,0);
+                if (rows > 0) transport(p, rows);
             };
 
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
