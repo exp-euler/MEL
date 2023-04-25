@@ -56,37 +56,46 @@ template<typename MSG> void VecVVSTL_DeepCopy(std::vector<std::vector<double>> &
 
 class ClassB {
     public:
-        void set_vec2(std::vector<double> &vec) {
-            vec2 = vec;
+        void set_vecB(std::vector<double> &vec) {
+            vecB = vec;
         }
 
-        std::vector<double> get_vec2() {
-            return vec2;
+        std::vector<double> get_vecB() {
+            return vecB;
         }
 
     template<typename MSG>
     void DeepCopy(MSG &msg) {
-        msg.packSTL(vec2);
+        msg.packSTL(vecB);
     }
 
     private:
-        std::vector<double> vec2;
+        std::vector<double> vecB;
 };
 
 class ClassA {
     public:
-        ClassA(ClassB &obj) : objB(&obj) {};
-        void set_vec1(std::vector<std::vector<double>> &vec) {
-            vec1 = vec;
+        ClassA() {}; // Default constructor
+        ClassA(ClassB &obj) : objB(&obj) {}; // Assign constructor
+        void set_vecA(std::vector<std::vector<double>> &vec) {
+            vecA = vec;
+        }
+
+        std::vector<std::vector<double>> get_vecA() {
+            return vecA;
+        }
+
+        ClassB* get_objB() {
+            return objB;
         }
 
         template<typename MSG>
         void DeepCopy(MSG &msg) {
-            msg. template packSTL<std::vector<double>, VecVSTL_DeepCopy>(vec1);
+            msg. template packSTL<std::vector<double>, VecVSTL_DeepCopy>(vecA);
             msg.packPtr(objB);
         }
     private:
-        std::vector<std::vector<double>> vec1;
+        std::vector<std::vector<double>> vecA;
         ClassB *objB;
 };
 
@@ -108,8 +117,12 @@ int main(int argc, char *argv[]) {
     if(rank == 0){
         ClassB B0;
         std::vector<double> doubles_for_B = {1.2, 1.4, 1.789};
-        B0.set_vec2(doubles_for_B);
-        MEL::Deep::Send(B0, 1, 17, comm);
+        B0.set_vecB(doubles_for_B);
+
+        ClassA A0(B0);
+        std::vector<std::vector<double>> doubles_for_A = {{2.3, 3.4},{2.1, 3.6}};
+        A0.set_vecA(doubles_for_A);
+        MEL::Deep::Send(A0, 1, 17, comm);
 
         /*
         double d0 = 2.4;
@@ -185,9 +198,9 @@ int main(int argc, char *argv[]) {
     MEL::Barrier(comm);
 
     if(rank == 1){
-        ClassB B1;
-        MEL::Deep::Recv(B1, 0, 17, comm);
-        std::cout << "Rank1: " << B1.get_vec2()[0] << "\n";
+        ClassA A1;
+        MEL::Deep::Recv(A1, 0, 17, comm);
+        std::cout << "Rank1: " << (A1.get_objB())->get_vecB()[0] << "\n";
 
         /*
         std::vector<std::vector<double>> T1;
