@@ -6,7 +6,6 @@
 #include<Eigen/Dense>
 #include<iostream>
 
-
 // TESTING FROM PAPER
 struct StructA {
  std::vector<int> arr;
@@ -52,6 +51,49 @@ template<typename MSG> void VecVVSTL_DeepCopy(std::vector<std::vector<double>> &
     msg. template packSTL<std::vector<double>, VecVSTL_DeepCopy>(obj);
 }
 
+
+// #######################################
+
+class ClassB {
+    public:
+        void set_vec2(std::vector<double> &vec) {
+            vec2 = vec;
+        }
+
+        std::vector<double> get_vec2() {
+            return vec2;
+        }
+
+    template<typename MSG>
+    void DeepCopy(MSG &msg) {
+        msg.packSTL(vec2);
+    }
+
+    private:
+        std::vector<double> vec2;
+};
+
+class ClassA {
+    public:
+        ClassA(ClassB &obj) : objB(&obj) {};
+        void set_vec1(std::vector<std::vector<double>> &vec) {
+            vec1 = vec;
+        }
+
+        template<typename MSG>
+        void DeepCopy(MSG &msg) {
+            msg. template packSTL<std::vector<double>, VecVSTL_DeepCopy>(vec1);
+            msg.packPtr(objB);
+        }
+    private:
+        std::vector<std::vector<double>> vec1;
+        ClassB *objB;
+};
+
+// #######################################
+
+
+
 int main(int argc, char *argv[]) {
     MEL::Init(argc,argv);
 
@@ -64,6 +106,10 @@ int main(int argc, char *argv[]) {
     // Send by pointer to the class object as well as by value
 
     if(rank == 0){
+        ClassB B0;
+        std::vector<double> doubles_for_B = {1.2, 1.4, 1.789};
+        B0.set_vec2(doubles_for_B);
+        MEL::Deep::Send(B0, 1, 17, comm);
 
         /*
         double d0 = 2.4;
@@ -73,11 +119,13 @@ int main(int argc, char *argv[]) {
         MEL::Deep::Send<std::vector<std::vector<double>>, MEL::Deep::PointerHashMap, VecVSTL_DeepCopy> (T0, 1, 99, comm);
         */
 
+        /*
         double d0 = 2.4;
         std::vector<std::vector<std::vector<double>>> T0 {{{d0}}};
         std::cout << "Rank0: " << "\n";
         std::cout << ((T0[0])[0])[0] << "\n";
         MEL::Deep::Send<std::vector<std::vector<std::vector<double>>>, MEL::Deep::PointerHashMap, VecVVSTL_DeepCopy> (T0, 1, 99, comm);
+        */
 
         /*
         //std::vector<double> T0 {1.0, 3.5, 2.5};
@@ -137,6 +185,9 @@ int main(int argc, char *argv[]) {
     MEL::Barrier(comm);
 
     if(rank == 1){
+        ClassB B1;
+        MEL::Deep::Recv(B1, 0, 17, comm);
+        std::cout << "Rank1: " << B1.get_vec2()[0] << "\n";
 
         /*
         std::vector<std::vector<double>> T1;
@@ -146,11 +197,13 @@ int main(int argc, char *argv[]) {
         std::cout << (T1[0])[0] << "\n";
         */
 
+        /*
         std::vector<std::vector<std::vector<double>>> T1;
         MEL::Deep::Recv<std::vector<std::vector<std::vector<double>>>, MEL::Deep::PointerHashMap,
                 VecVVSTL_DeepCopy> (T1, 0, 99, comm);
         std::cout << "Rank1: " << "\n";
         std::cout << ((T1[0])[0])[0] << "\n";
+        */
 
         /*
         std::vector<double *> T1;

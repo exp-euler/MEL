@@ -846,6 +846,7 @@ namespace MEL {
                     obj.resize(rows, cols);
                 }
 
+                std::cout << "Assertion Fail Here!" << "\n";
                 double *p = &obj(0,0);
                 if (rows+cols > 0) transport(p, rows*cols);
             };
