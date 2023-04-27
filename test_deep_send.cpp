@@ -115,14 +115,11 @@ int main(int argc, char *argv[]) {
     // Send by pointer to the class object as well as by value
 
     if(rank == 0){
-        ClassB B0;
-        std::vector<double> doubles_for_B = {1.2, 1.4, 1.789};
-        B0.set_vecB(doubles_for_B);
-
-        ClassA A0(B0);
+        ClassA A0;
         std::vector<std::vector<double>> doubles_for_A = {{2.3, 3.4},{2.1, 3.6}};
         A0.set_vecA(doubles_for_A);
-        MEL::Deep::Send(A0, 1, 17, comm);
+        std::vector<ClassA> vec0_classesA = {A0};
+        MEL::Deep::Send(vec0_classesA, 1, 17, comm);
 
         /*
         double d0 = 2.4;
@@ -198,9 +195,15 @@ int main(int argc, char *argv[]) {
     MEL::Barrier(comm);
 
     if(rank == 1){
-        ClassA A1;
-        MEL::Deep::Recv(A1, 0, 17, comm);
-        std::cout << "Rank1: " << (A1.get_objB())->get_vecB()[0] << "\n";
+        ClassB B1;
+        std::vector<double> doubles_for_B = {1.2, 1.4, 1.789};
+        B1.set_vecB(doubles_for_B);
+
+        ClassA A1(B1);
+        std::vector<ClassA> vec1_classesA;
+        MEL::Deep::Recv(vec1_classesA, 0, 17, comm);
+        //std::cout << "Rank1: " << (vec1_classesA[0].get_objB())->get_vecB()[0] << "\n";
+        std::cout << "Rank1: " << (vec1_classesA[0].get_vecA()[0])[0] << "\n";
 
         /*
         std::vector<std::vector<double>> T1;
