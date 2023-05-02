@@ -64,6 +64,8 @@ class ClassB {
             return vecB;
         }
 
+        virtual void say_hi() = 0;
+
     template<typename MSG>
     void DeepCopy(MSG &msg) {
         msg.packSTL(vecB);
@@ -98,6 +100,12 @@ class ClassA {
         std::vector<std::vector<double>> vecA;
         ClassB *objB;
 };
+class SubClassB : public ClassB {
+    public:
+        void say_hi(){
+            std::cout << "HI!" << "\n";
+        }
+};
 
 // #######################################
 
@@ -115,11 +123,14 @@ int main(int argc, char *argv[]) {
     // Send by pointer to the class object as well as by value
 
     if(rank == 0){
-        ClassA A0;
-        std::vector<std::vector<double>> doubles_for_A = {{2.3, 3.4},{2.1, 3.6}};
-        A0.set_vecA(doubles_for_A);
-        std::vector<ClassA> vec0_classesA = {A0};
-        MEL::Deep::Send(vec0_classesA, 1, 17, comm);
+        ClassB* p_objBB0(new SubClassB());
+        std::vector<double> vec = {1.0, 2.1};
+        p_objBB0->set_vecB(vec);
+        std::vector<ClassB *> vec0_pClassesB = {p_objBB0};
+        //MEL::Deep::Send<SubClassB>(vec0_pClassesB, 1, 17, comm);
+        MEL::Deep::Send<ClassB*, SubClassB>(p_objBB0, 1, 17, comm);
+
+        delete p_objBB0;
 
         /*
         double d0 = 2.4;
@@ -195,15 +206,24 @@ int main(int argc, char *argv[]) {
     MEL::Barrier(comm);
 
     if(rank == 1){
-        ClassB B1;
-        std::vector<double> doubles_for_B = {1.2, 1.4, 1.789};
-        B1.set_vecB(doubles_for_B);
 
-        ClassA A1(B1);
-        std::vector<ClassA> vec1_classesA;
-        MEL::Deep::Recv(vec1_classesA, 0, 17, comm);
-        //std::cout << "Rank1: " << (vec1_classesA[0].get_objB())->get_vecB()[0] << "\n";
-        std::cout << "Rank1: " << (vec1_classesA[0].get_vecA()[0])[0] << "\n";
+        std::vector<ClassB *> vec1_pClassesB;
+        ClassB * p_objBB1;
+        //MEL::Deep::Recv<SubClassB>(vec1_pClassesB, 0, 17, comm);
+        MEL::Deep::Recv<ClassB*, SubClassB>(p_objBB1, 0, 17, comm);
+        std::cout << "Rank1: " << p_objBB1->get_vecB()[0] << "\n";
+        p_objBB1->say_hi();
+        //std::cout << "Rank1: " << vec1_pClassesB[0]->get_vecB()[0] << "\n";
+        //std::cout << vec1_pClassesB.size() << "\n";
+        //vec1_pClassesB[0]->say_hi();
+        // Line below doesn't work. It isnt sent as a pointer to the
+        // derived class, but as pointer of base class.
+        // https://stackoverflow.com/questions/18153184/c-copying-of-objects-of-derived-class-into-objects-of-base-class
+        // Fix by changing the MEL::MemAlloc function to allocate a
+        // pointer of derived instead of base...
+        // Check type of the pointer by
+        // typedef typename std::remove_pointer<P>::type T; // where P == T*, find T
+        //std::cout << "Rank1: " << vec1_pClassesB[0]->get_vecB()[0] << "\n";
 
         /*
         std::vector<std::vector<double>> T1;

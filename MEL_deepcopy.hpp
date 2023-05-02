@@ -368,11 +368,13 @@ namespace MEL {
                 transport(ptr, 1);
             };
 
-            template<typename P>
+            template<typename Q = void, typename P>
             inline enable_if_pointer<P> transportAlloc(P &ptr, const int len) {
                 if (!TRANSPORT_METHOD::SOURCE) {
-                    typedef typename std::remove_pointer<P>::type T; // where P == T*, find T
-                    ptr = (len > 0 && ptr != nullptr) ? MEL::MemAlloc<T>(len) : nullptr; 
+                    //typedef typename std::remove_pointer<Q>::type T; // where Q == T*, find T
+                    ptr = (len > 0 && ptr != nullptr) ? MEL::MemAlloc<Q>(len) : nullptr; 
+                    //ptr = new Q();
+                    std::cout << "Allocation here!" << "\n";
                 }
                 transport(ptr, len);
             };
@@ -429,9 +431,9 @@ namespace MEL {
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Pointer
 
-            template<typename T>
+            template<typename Q = void, typename T>
             inline enable_if_not_deep<T> packPtr(T* &ptr, int len = 1) {
-                transportAlloc(ptr, len);
+                transportAlloc<Q>(ptr, len);
             };
 
             template<typename T, DEEP_FUNCTOR<T, TRANSPORT_METHOD, HASH_MAP> F>
@@ -445,9 +447,9 @@ namespace MEL {
                 }
             };
 
-            template<typename D>
+            template<typename Q = void, typename D>
             inline enable_if_deep<D> packPtr(D* &ptr, int len = 1) {
-                transportAlloc(ptr, len);
+                transportAlloc<Q>(ptr, len);
                 /// Copy elements
                 if (ptr != nullptr) {
                     for (int i = 0; i < len; ++i) {
@@ -538,7 +540,7 @@ namespace MEL {
                 }
             };
 
-            template<typename D>
+            template<typename Q = void, typename D>
             inline enable_if_deep<D> packRootPtr(D* &ptr, int len = 1) {
                 // Explicitly transport the pointer value for the root node
                 size_t addr = (size_t) ptr;
@@ -548,8 +550,9 @@ namespace MEL {
                 D *oldPtr = ptr;
                 if (pointerMap.find(oldPtr, ptr)) return;
 
-                transportAlloc(ptr, len);
+                transportAlloc<Q>(ptr, len);
                 pointerMap.insert(oldPtr, ptr);
+                std::cout << "PTR" << "\n";
 
                 /// Copy elements
                 if (ptr != nullptr) {
@@ -675,7 +678,7 @@ namespace MEL {
             // Root STL
 
             // ###### EDITED #######
-            template<typename T>
+            template<typename Q = void, typename T>
             inline enable_if_not_deep_pointer<T> packRootSTL(std::vector<T> &obj) {
                 int len;
                 if (TRANSPORT_METHOD::SOURCE) {
@@ -686,12 +689,14 @@ namespace MEL {
                     for (int i = 0; i < len; ++i) (&obj[i])->~T();
                 }
 
-                T *p = &obj[0];
+                Q *temp = new Q();
+                //T *p = &obj[0];
+                Q **p = &temp;
                 if (len > 0) transport(p, len);
                 // ###### ADDED #######
                 /// Copy content
                 for (int i = 0; i < len; ++i) {
-                    packPtr(obj[i]);
+                    packPtr<Q>(obj[i]);
                 }
                 // ###### ADDED #######
             };
@@ -926,9 +931,9 @@ namespace MEL {
         };
 
 #define TEMPLATE_MAT_E template<typename M, typename HASH_MAP = MEL::Deep::PointerHashMap>
-#define TEMPLATE_STL template<typename S, typename HASH_MAP = MEL::Deep::PointerHashMap>
+#define TEMPLATE_STL template<typename Q = void, typename HASH_MAP = MEL::Deep::PointerHashMap, typename S>
 #define TEMPLATE_T   template<typename T, typename HASH_MAP = MEL::Deep::PointerHashMap>
-#define TEMPLATE_P   template<typename P, typename HASH_MAP = MEL::Deep::PointerHashMap>
+#define TEMPLATE_P   template<typename P, typename Q = void, typename HASH_MAP = MEL::Deep::PointerHashMap>
 
 #define TEMPLATE_STL_F(transport_method) template<typename S, typename HASH_MAP, DEEP_FUNCTOR<typename S::value_type, transport_method, HASH_MAP> F>
 #define TEMPLATE_T_F(transport_method)   template<typename T, typename HASH_MAP, DEEP_FUNCTOR<T, transport_method, HASH_MAP> F>
@@ -1080,13 +1085,13 @@ namespace MEL {
 
         TEMPLATE_P
         inline enable_if_pointer<P> Send(const P &ptr, const int dst, const int tag, const Comm &comm) {
-            Send((P) ptr, dst, tag, comm);
+            Send<P, Q>((P) ptr, dst, tag, comm);
         };
 
         TEMPLATE_P
         inline enable_if_pointer<P> Send(P &ptr, const int dst, const int tag, const Comm &comm) {
             Message<TransportSend, HASH_MAP> msg(dst, tag, comm);
-            msg.packRootPtr(ptr);
+            msg. template packRootPtr<Q>(ptr);
         };
 
         TEMPLATE_P_F(TransportSend)
@@ -1135,7 +1140,7 @@ namespace MEL {
         inline enable_if_stl<S> Send(S &obj, const int dst, const int tag, const Comm &comm) {
             std::cout << "Send STL" << "\n";
             Message<TransportSend, HASH_MAP> msg(dst, tag, comm);
-            msg.packRootSTL(obj);
+            msg. template packRootSTL<Q>(obj);
         };
 
         TEMPLATE_STL_F(TransportSend)
@@ -1339,7 +1344,7 @@ namespace MEL {
         inline enable_if_pointer<P> Recv(P &ptr, const int src, const int tag, const Comm &comm) {
             Message<TransportRecv, HASH_MAP> msg(src, tag, comm);
             
-            msg.packRootPtr(ptr);
+            msg. template packRootPtr<Q>(ptr);
         };
 
         TEMPLATE_P_F(TransportRecv)
@@ -1382,7 +1387,7 @@ namespace MEL {
         inline enable_if_stl<S> Recv(S &obj, const int src, const int tag, const Comm &comm) {
             std::cout << "Recv STL" << "\n";
             Message<TransportRecv, HASH_MAP> msg(src, tag, comm);
-            msg.packRootSTL(obj);
+            msg. template packRootSTL<Q>(obj);
         };
 
         TEMPLATE_STL_F(TransportRecv)
