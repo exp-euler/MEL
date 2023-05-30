@@ -54,6 +54,12 @@ template<typename MSG> void VecVVSTL_DeepCopy(std::vector<std::vector<double>> &
 
 // #######################################
 
+template<typename MSG>
+void VecM_Eigen_DeepCopy(Eigen::MatrixXd &obj, MSG &msg) {
+    msg.packMatrixXd(obj);
+    std::cout << "#######################################Print??" << "\n";
+}
+
 class ClassB {
     public:
         void set_vecB(std::vector<double> &vec) {
@@ -64,15 +70,31 @@ class ClassB {
             return vecB;
         }
 
-        virtual void say_hi() = 0;
+        void set_matB(std::vector<Eigen::MatrixXd> &mat) {
+            matB = mat;
+        }
+
+        std::vector<Eigen::MatrixXd> get_matB() {
+            return matB;
+        }
+
+        virtual void say_hi() {
+            std::cout << "Here?" << "\n";
+        }
 
     template<typename MSG>
-    void DeepCopy(MSG &msg) {
+    void DeepCopyB(MSG &msg) {
         msg.packSTL(vecB);
+        msg. template packSTL<Eigen::MatrixXd, VecM_Eigen_DeepCopy>(matB);
+        std::cout << "##################DEEP" << "\n";
     }
+
+    //virtual ~ClassB(){};
 
     private:
         std::vector<double> vecB;
+        std::vector<Eigen::MatrixXd> matB;
+        std::vector<Eigen::MatrixXd> matBempty;
 };
 
 class ClassA {
@@ -105,6 +127,15 @@ class SubClassB : public ClassB {
         void say_hi(){
             std::cout << "HI!" << "\n";
         }
+
+        void say_hello(){
+            std::cout << "HELLO!" << "\n";
+        }
+
+        template<typename MSG>
+        void DeepCopy(MSG &msg) {
+            this->DeepCopyB(msg);
+        }
 };
 
 // #######################################
@@ -123,14 +154,29 @@ int main(int argc, char *argv[]) {
     // Send by pointer to the class object as well as by value
 
     if(rank == 0){
-        ClassB* p_objBB0(new SubClassB());
-        std::vector<double> vec = {1.0, 2.1};
-        p_objBB0->set_vecB(vec);
-        std::vector<ClassB *> vec0_pClassesB = {p_objBB0};
-        //MEL::Deep::Send<SubClassB>(vec0_pClassesB, 1, 17, comm);
-        MEL::Deep::Send<ClassB*, SubClassB>(p_objBB0, 1, 17, comm);
 
-        delete p_objBB0;
+        SubClassB* p_objBB0(new SubClassB);
+        SubClassB* p1_objBB0(new SubClassB);
+        //SubClassB p_objBB0;
+        std::vector<double> vec = {1.4578909, 2.1};
+        Eigen::MatrixXd mat {{1,2,3},{4,5,6},{7,8,9}};
+        std::vector<Eigen::MatrixXd> vecM = {mat};
+        p_objBB0->set_vecB(vec);
+        p_objBB0->set_matB(vecM);
+        std::vector<SubClassB *> vec0_pClassesB = {p_objBB0};
+        MEL::Deep::Send(vec0_pClassesB, 1, 17, comm);
+        //SubClassB* casted = static_cast<SubClassB *> (p_objBB0);
+        //MEL::Deep::Send(casted, 1, 17, comm);
+        //MEL::Deep::Send(p_objBB0, 1, 17, comm);
+        //p_objBB0->say_hello();
+        std::cout << "Rank0: " << p_objBB0->get_vecB()[0] << "\n";
+
+        std::cout<<"Rank0 Vptr = "<< *(int**)p_objBB0 <<std::endl;
+        std::cout<<"Rank0 Vptr1 = "<< *(int**)p1_objBB0 <<std::endl;
+        p_objBB0->say_hi();
+        //casted->say_hi();
+
+        //delete p_objBB0;
 
         /*
         double d0 = 2.4;
@@ -207,23 +253,34 @@ int main(int argc, char *argv[]) {
 
     if(rank == 1){
 
-        std::vector<ClassB *> vec1_pClassesB;
-        ClassB * p_objBB1;
-        //MEL::Deep::Recv<SubClassB>(vec1_pClassesB, 0, 17, comm);
-        MEL::Deep::Recv<ClassB*, SubClassB>(p_objBB1, 0, 17, comm);
-        std::cout << "Rank1: " << p_objBB1->get_vecB()[0] << "\n";
-        p_objBB1->say_hi();
-        //std::cout << "Rank1: " << vec1_pClassesB[0]->get_vecB()[0] << "\n";
-        //std::cout << vec1_pClassesB.size() << "\n";
-        //vec1_pClassesB[0]->say_hi();
-        // Line below doesn't work. It isnt sent as a pointer to the
-        // derived class, but as pointer of base class.
-        // https://stackoverflow.com/questions/18153184/c-copying-of-objects-of-derived-class-into-objects-of-base-class
-        // Fix by changing the MEL::MemAlloc function to allocate a
-        // pointer of derived instead of base...
-        // Check type of the pointer by
-        // typedef typename std::remove_pointer<P>::type T; // where P == T*, find T
-        //std::cout << "Rank1: " << vec1_pClassesB[0]->get_vecB()[0] << "\n";
+        std::vector<SubClassB *> vec1_pClassesB;
+        SubClassB* casted1;
+        SubClassB* casted2 = new SubClassB();
+        //ClassB* p_objBB1;
+        MEL::Deep::Recv(vec1_pClassesB, 0, 17, comm);
+        casted1 = vec1_pClassesB[0];
+        //SubClassB TEMP = *static_cast<SubClassB*>(casted1);
+        ClassB* casted3 = new SubClassB(*casted1);
+        //MEL::Deep::Recv(casted1, 0, 17, comm);
+        //ClassB * p_objBB1 = casted1;
+        //std::cout << "Rank1: " << p_objBB1->get_vecB()[0] << "\n";
+        //p_objBB1->say_hello();
+        //MEL::Deep::TESTING(casted1);
+        std::cout << "Rank1: " << casted1->get_vecB()[0] << "\n";
+
+        std::cout<<"Rank1 Vptr = "<< *(double**)casted1 <<std::endl;
+        std::cout<<"Rank1 Vptr1 = "<< *(double**)casted2 <<std::endl;
+        std::cout<<"Rank1 Vptr2 = "<< *(double**)casted3 <<std::endl;
+        //std::cout<<"Rank1 Vptr1 g++ = "<< casted2->_vfptr_ClassB <<std::endl;
+        casted3->say_hi();
+        std::cout << "Rank1: " << casted3->get_vecB()[0] << "\n";
+        std::cout << "Rank1: " << casted3->get_matB()[0] << "\n";
+
+        //ClassB* temp = new ClassB();
+        //std::cout << "Rank1: " << temp->_vptr << "\n";
+        // Try to call say_hi() from ctable directly
+
+        //casted1->_vptr = temp->_vptr;
 
         /*
         std::vector<std::vector<double>> T1;
