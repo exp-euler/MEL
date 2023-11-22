@@ -804,6 +804,7 @@ namespace MEL {
 
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Root Eigen
+
             //template<typename T>
             //inline enable_if_not_deep<T> packRootMatrixXd(Eigen::Matrix<T, T_rows, T_cols> &obj) {
             inline enable_if_not_deep<double> packRootMatrixXd(Eigen::MatrixXd &obj) {
@@ -824,6 +825,20 @@ namespace MEL {
                 //T *p = &obj[0];
                 double *p = &obj(0,0);
                 if (rows+cols > 0) transport(p, rows*cols);
+            };
+
+            inline enable_if_not_deep<double> packRootVectorXd(Eigen::VectorXd &obj) {
+                int rows; // Because it is saved as an Eigen Matrix
+                if (TRANSPORT_METHOD::SOURCE) {
+                    rows = obj.rows(); transport(rows);
+                }
+                else {
+                    transport(rows);
+                    obj.resize(rows);
+                }
+
+                double *p = &obj(0,0);
+                if (rows > 0) transport(p, rows);
             };
 
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -923,6 +938,7 @@ namespace MEL {
         };
 
 #define TEMPLATE_MAT_E template<typename M, typename HASH_MAP = MEL::Deep::PointerHashMap>
+#define TEMPLATE_VEC_E template<typename V, typename HASH_MAP = MEL::Deep::PointerHashMap>
 #define TEMPLATE_STL template<typename S, typename HASH_MAP = MEL::Deep::PointerHashMap>
 #define TEMPLATE_T   template<typename T, typename HASH_MAP = MEL::Deep::PointerHashMap>
 #define TEMPLATE_P   template<typename P, typename HASH_MAP = MEL::Deep::PointerHashMap>
@@ -1181,6 +1197,14 @@ namespace MEL {
             msg.packRootMatrixXd(obj);
         };
 
+        // Root VectorXd
+
+        TEMPLATE_VEC_E
+        inline enable_if_eigen_vector<V> Send(V &obj, const int dst, const int tag, const Comm &comm) {
+            Message<TransportSend, HASH_MAP> msg(dst, tag, comm);
+            msg.packRootVectorXd(obj);
+        };
+
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Object
 
@@ -1418,6 +1442,14 @@ namespace MEL {
         inline enable_if_eigen_matrix<M> Recv(M &obj, const int src, const int tag, const Comm &comm) {
             Message<TransportRecv, HASH_MAP> msg(src, tag, comm);
             msg.packRootMatrixXd(obj);
+        };
+
+        // Root VectorXd
+
+        TEMPLATE_VEC_E
+        inline enable_if_eigen_vector<V> Recv(V &obj, const int src, const int tag, const Comm &comm) {
+            Message<TransportRecv, HASH_MAP> msg(src, tag, comm);
+            msg.packRootVectorXd(obj);
         };
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

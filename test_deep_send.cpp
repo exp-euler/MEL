@@ -57,7 +57,6 @@ template<typename MSG> void VecVVSTL_DeepCopy(std::vector<std::vector<double>> &
 template<typename MSG>
 void VecM_Eigen_DeepCopy(Eigen::MatrixXd &obj, MSG &msg) {
     msg.packMatrixXd(obj);
-    std::cout << "#######################################Print??" << "\n";
 }
 
 class ClassB {
@@ -86,7 +85,6 @@ class ClassB {
     void DeepCopyB(MSG &msg) {
         msg.packSTL(vecB);
         msg. template packSTL<Eigen::MatrixXd, VecM_Eigen_DeepCopy>(matB);
-        std::cout << "##################DEEP" << "\n";
     }
 
     //virtual ~ClassB(){};
@@ -155,6 +153,7 @@ int main(int argc, char *argv[]) {
 
     if(rank == 0){
 
+        /*
         SubClassB* p_objBB0(new SubClassB);
         SubClassB* p1_objBB0(new SubClassB);
         //SubClassB p_objBB0;
@@ -177,6 +176,7 @@ int main(int argc, char *argv[]) {
         //casted->say_hi();
 
         //delete p_objBB0;
+        */
 
         /*
         double d0 = 2.4;
@@ -242,6 +242,11 @@ int main(int argc, char *argv[]) {
         MEL::Deep::Send(T0, 1, 99, comm);
         */
 
+        Eigen::VectorXd T0 {{1,2,3}};
+        std::cout << "Rank0: " << "\n";
+        std::cout << T0 << "\n";
+        MEL::Deep::Send(T0, 1, 99, comm);
+
         /*
         StructA sA;
         MEL::Deep::Send<StructA, MEL::Deep::PointerHashMap,
@@ -253,6 +258,7 @@ int main(int argc, char *argv[]) {
 
     if(rank == 1){
 
+        /*
         std::vector<SubClassB *> vec1_pClassesB;
         SubClassB* casted1;
         SubClassB* casted2 = new SubClassB();
@@ -281,6 +287,7 @@ int main(int argc, char *argv[]) {
         // Try to call say_hi() from ctable directly
 
         //casted1->_vptr = temp->_vptr;
+        */
 
         /*
         std::vector<std::vector<double>> T1;
@@ -346,6 +353,11 @@ int main(int argc, char *argv[]) {
         std::cout << T1 << "\n";
         */
 
+
+        Eigen::VectorXd T1;
+        MEL::Deep::Recv(T1, 0, 99, comm);
+        std::cout << "Rank1: " << "\n";
+        std::cout << T1 << "\n";
         /*
         StructA sA_r;
         MEL::Deep::Recv<StructA, MEL::Deep::PointerHashMap,
