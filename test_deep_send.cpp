@@ -4,6 +4,7 @@
 #include "MEL_deepcopy.hpp"
 
 #include<Eigen/Dense>
+#include <Eigen/Sparse>
 #include<iostream>
 
 // TESTING FROM PAPER
@@ -43,6 +44,11 @@ template<typename MSG> void VecArr1D_DeepCopy(Eigen::ArrayXi &obj, MSG &msg) {
 
 // External - Global free deep-copy function for vectors of vectors
 template<typename MSG> void VecVSTL_DeepCopy(std::vector<double> &obj, MSG &msg) {
+    msg.packSTL(obj);
+}
+
+// External - Global free deep-copy function for vectors of vectors
+template<typename MSG> void VecVSTL_DeepCopy(std::vector<size_t> &obj, MSG &msg) {
     msg.packSTL(obj);
 }
 
@@ -178,12 +184,30 @@ int main(int argc, char *argv[]) {
         //delete p_objBB0;
         */
 
+        // Sending an Eigen Sparse matrix over MPI
+        std::vector<Eigen::Triplet<double>> triplets;
+        Eigen::SparseMatrix<double, Eigen::ColMajor> matrix; // should be ColMajor for SparseLU
+        matrix.resize(6,6);
+        triplets.emplace_back(0, 0, 1.0);
+        triplets.emplace_back(1, 4, 2.0);
+        triplets.emplace_back(3, 2, 3.0);
+        triplets.emplace_back(5, 5, 4.0);
+        matrix.setFromTriplets(triplets.begin(), triplets.end());
+        std::cout << "Sparse Matrix: " << matrix << std::endl;
+
+        std::cout << "valuePtr: " << matrix.valuePtr() << std::endl;
+        std::cout << "innerIndex: " << matrix.innerIndexPtr() << std::endl;
+        std::cout << "outerIndex: " << matrix.outerIndexPtr() << std::endl;
+        MEL::Deep::Send<>(matrix, 1, 99, comm);
+
         /*
-        double d0 = 2.4;
-        std::vector<std::vector<double>> T0 {{d0}};
+        size_t d0 = 4;
+        size_t d1 = 4;
+        size_t d2 = 4;
+        std::vector<std::vector<size_t>> T0 {{d0}, {d1, d2}};
         std::cout << "Rank0: " << "\n";
         std::cout << (T0[0])[0] << "\n";
-        MEL::Deep::Send<std::vector<std::vector<double>>, MEL::Deep::PointerHashMap, VecVSTL_DeepCopy> (T0, 1, 99, comm);
+        MEL::Deep::Send<std::vector<std::vector<size_t>>, MEL::Deep::PointerHashMap, VecVSTL_DeepCopy> (T0, 1, 99, comm);
         */
 
         /*
@@ -242,10 +266,12 @@ int main(int argc, char *argv[]) {
         MEL::Deep::Send(T0, 1, 99, comm);
         */
 
+        /*
         Eigen::VectorXd T0 {{1,2,3}};
         std::cout << "Rank0: " << "\n";
         std::cout << T0 << "\n";
         MEL::Deep::Send(T0, 1, 99, comm);
+        */
 
         /*
         StructA sA;
@@ -289,9 +315,14 @@ int main(int argc, char *argv[]) {
         //casted1->_vptr = temp->_vptr;
         */
 
+        Eigen::SparseMatrix<double, Eigen::ColMajor> matrix1; // should be ColMajor for SparseLU
+        MEL::Deep::Recv(matrix1, 0, 99, comm);
+        std::cout << "Rank1: " << "\n";
+        std::cout << matrix1 << "\n";
+
         /*
-        std::vector<std::vector<double>> T1;
-        MEL::Deep::Recv<std::vector<std::vector<double>>, MEL::Deep::PointerHashMap,
+        std::vector<std::vector<size_t>> T1;
+        MEL::Deep::Recv<std::vector<std::vector<size_t>>, MEL::Deep::PointerHashMap,
                 VecVSTL_DeepCopy> (T1, 0, 99, comm);
         std::cout << "Rank1: " << "\n";
         std::cout << (T1[0])[0] << "\n";
@@ -354,10 +385,12 @@ int main(int argc, char *argv[]) {
         */
 
 
+        /*
         Eigen::VectorXd T1;
         MEL::Deep::Recv(T1, 0, 99, comm);
         std::cout << "Rank1: " << "\n";
         std::cout << T1 << "\n";
+        */
         /*
         StructA sA_r;
         MEL::Deep::Recv<StructA, MEL::Deep::PointerHashMap,

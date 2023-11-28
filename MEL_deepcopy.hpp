@@ -26,6 +26,7 @@ SOFTWARE.
 #include "MEL.hpp"
 
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
 #include <vector>
 #include <list>
 #include <fstream>
@@ -310,6 +311,9 @@ namespace MEL {
         template<typename T> struct is_eigen_matrix : public std::false_type {};
         template<>
         struct is_eigen_matrix<Eigen::MatrixXd> : public std::true_type{};
+        template<typename T> struct is_eigen_sparse_matrix_col : public std::false_type {};
+        template<>
+        struct is_eigen_sparse_matrix_col<Eigen::SparseMatrix<double, Eigen::ColMajor>> : public std::true_type{};
         //template<typename Scalar, int RowsAtCompile, int ColsAtCompile>
         //struct is_eigen_matrix<Eigen::Matrix<Scalar, RowsAtCompile, ColsAtCompile>> : public std::true_type{};
         template<typename T> struct is_eigen_vector : public std::false_type {};
@@ -325,6 +329,8 @@ namespace MEL {
         template<typename T, typename R = void>
         using enable_if_eigen_matrix = typename std::enable_if<is_eigen_matrix<T>::value, R>::type;
         template<typename T, typename R = void>
+        using enable_if_eigen_sparse_matrix_col = typename std::enable_if<is_eigen_sparse_matrix_col<T>::value, R>::type;
+        template<typename T, typename R = void>
         using enable_if_eigen_vector = typename std::enable_if<is_eigen_vector<T>::value, R>::type;
         template<typename T, typename R = void>
         using enable_if_eigen_array1D = typename std::enable_if<is_eigen_array1D<T>::value, R>::type;
@@ -335,9 +341,9 @@ namespace MEL {
         using enable_if_stl = typename std::enable_if<is_vector<T>::value || is_list<T>::value, R>::type; //  || is_string<T>::value
         template<typename T, typename R = void>
         // TODO: Added not_eigen in definition, but not in name!
-        using enable_if_not_pointer_not_stl = typename std::enable_if<!(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value || is_eigen_vector<T>::value || is_eigen_array1D<T>::value || is_eigen_array2D<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
+        using enable_if_not_pointer_not_stl = typename std::enable_if<!(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value || is_eigen_sparse_matrix_col<T>::value || is_eigen_vector<T>::value || is_eigen_array1D<T>::value || is_eigen_array2D<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
         template<typename T, typename R = void>
-        using enable_if_deep_not_pointer_not_stl = typename std::enable_if<HasDeepCopyMethod<T>::Has && !(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value || is_eigen_vector<T>::value || is_eigen_array1D<T>::value || is_eigen_array2D<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
+        using enable_if_deep_not_pointer_not_stl = typename std::enable_if<HasDeepCopyMethod<T>::Has && !(is_vector<T>::value || is_list<T>::value || is_eigen_matrix<T>::value || is_eigen_sparse_matrix_col<T>::value || is_eigen_vector<T>::value || is_eigen_array1D<T>::value || is_eigen_array2D<T>::value) && !std::is_pointer<T>::value, R>::type; //  || is_string<T>::value
 
         template<typename T, typename TRANSPORT_METHOD, typename HASH_MAP>
         using DEEP_FUNCTOR = void(*)(T&, MEL::Deep::Message<TRANSPORT_METHOD, HASH_MAP>&); 
@@ -827,6 +833,33 @@ namespace MEL {
                 if (rows+cols > 0) transport(p, rows*cols);
             };
 
+            inline enable_if_not_deep<double> packRootSparseMatrix(Eigen::SparseMatrix<double, Eigen::ColMajor> &obj) {
+                int rows;
+                int cols;
+                int nnz;
+                if (TRANSPORT_METHOD::SOURCE) {
+                    rows = obj.rows(); transport(rows);
+                    cols = obj.cols(); transport(cols);
+                    nnz = obj.nonZeros(); transport(nnz);
+                    assert(cols == obj.outerSize());
+                }
+                else {
+                    transport(rows); transport(cols); transport(nnz);
+                    obj.resize(rows, cols);
+                    obj.reserve(nnz);
+                }
+
+                //T *p = &obj[0];
+                double *vPtr = obj.valuePtr();
+                int *iPtr = obj.innerIndexPtr();
+                int *oPtr = obj.outerIndexPtr();
+                if (nnz > 0) {transport(vPtr, nnz); transport(iPtr, nnz);}
+                if (cols > 0) transport(oPtr, cols);
+                if (!TRANSPORT_METHOD::SOURCE) {
+                    obj.outerIndexPtr()[cols] = nnz;
+                }
+            };
+
             inline enable_if_not_deep<double> packRootVectorXd(Eigen::VectorXd &obj) {
                 int rows; // Because it is saved as an Eigen Matrix
                 if (TRANSPORT_METHOD::SOURCE) {
@@ -1197,6 +1230,14 @@ namespace MEL {
             msg.packRootMatrixXd(obj);
         };
 
+        // Root SparseMatrix
+
+        TEMPLATE_MAT_E
+        inline enable_if_eigen_sparse_matrix_col<M> Send(M &obj, const int dst, const int tag, const Comm &comm) {
+            Message<TransportSend, HASH_MAP> msg(dst, tag, comm);
+            msg.packRootSparseMatrix(obj);
+        };
+
         // Root VectorXd
 
         TEMPLATE_VEC_E
@@ -1442,6 +1483,14 @@ namespace MEL {
         inline enable_if_eigen_matrix<M> Recv(M &obj, const int src, const int tag, const Comm &comm) {
             Message<TransportRecv, HASH_MAP> msg(src, tag, comm);
             msg.packRootMatrixXd(obj);
+        };
+
+        // Root SparseMatrix
+
+        TEMPLATE_MAT_E
+        inline enable_if_eigen_sparse_matrix_col<M> Recv(M &obj, const int src, const int tag, const Comm &comm) {
+            Message<TransportRecv, HASH_MAP> msg(src, tag, comm);
+            msg.packRootSparseMatrix(obj);
         };
 
         // Root VectorXd
